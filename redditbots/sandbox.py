@@ -33,6 +33,7 @@ class BotSandbox(object):
         self._manager = manager
         self._nextReplyTime = 0
         self._replyQueue = []
+        self._db = None
 
     def defaultGlobals(self):
         globs = dict(__builtins__ = safe_builtins)
@@ -81,12 +82,13 @@ class BotSandbox(object):
 
     @property
     def database(self):
-        db = self._manager.getBotDB(self)
-        c = db.execute("PRAGMA user_version")
-        version = c.fetchone()[0]
-        newVersion = self._bot.onDBOpen(db, version)
-        db.execute("PRAGMA user_version=%i"%(newVersion))
-        return db
+        if self._db is None:
+            self._db = self._manager.getBotDB(self)
+            c = self._db.execute("PRAGMA user_version")
+            version = c.fetchone()[0]
+            newVersion = self._bot.onDBOpen(self._db, version)
+            self._db.execute("PRAGMA user_version=%i"%(newVersion))
+        return self._db
 
     def login(self):
         self._manager.loginBot(self)
