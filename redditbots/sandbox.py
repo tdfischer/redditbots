@@ -40,14 +40,19 @@ class BotSandbox(object):
         globs['dict'] = dict
         return globs
 
-    def _getattr(self, obj, name, default = None):
-        return getattr(obj, name, default)
-
     def username(self):
         raise NotImplementedError
 
     def password(self):
         raise NotImplementedError
+
+    def _getitem(self, obj, idx):
+        return obj[idx]
+
+    def _inplacevar(self, op, x, y):
+        globs = {'x': x, 'y': y}
+        exec 'x'+op+'y' in globs
+        return globs['x']
 
     def _loadBot(self):
         for klass in self.globals.values():
@@ -121,7 +126,10 @@ class BotSandbox(object):
         botGlobals = self._globals.copy()
         botGlobals['__name__'] = code.co_name
         self._globals['__name__'] = code.co_name
-        self._globals['_getattr_'] = self._getattr
+        self._globals['_getattr_'] = getattr
+        self._globals['_getiter_'] = iter
+        self._globals['_getitem_'] = self._getitem
+        self._globals['_inplacevar_'] = self._inplacevar
         self._globals['_print_'] = self._printer
         self._globals['__builtins__']['__import__'] = self._import
         exec(code) in self._globals
