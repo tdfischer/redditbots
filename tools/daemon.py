@@ -23,6 +23,7 @@ import argparse
 import sys
 import urllib2
 import time
+import monoclock
 
 def main(args):
     parser = argparse.ArgumentParser(description='Test a redditbot')
@@ -60,19 +61,24 @@ def main(args):
     r = botManager.getReddit()
 
     try:
-        r_all = r.get_subreddit('all').get_new_by_date()
+        while True:
+            r_all = r.get_subreddit('all').get_new_by_date()
 
-        print "Processing new submissions in /r/all"
-        for post in r_all:
-            botManager.triggerNewSubmission(post)
+            print "Processing new submissions in /r/all"
+            for post in r_all:
+                botManager.triggerNewSubmission(post)
 
-        print "Processing new comments"
-        for comment in r.get_all_comments():
-            botManager.triggerNewComment(comment)
+            print "Processing new comments"
+            for comment in r.get_all_comments():
+                botManager.triggerNewComment(comment)
 
-        while botManager.processReplyQueue():
-            time.sleep(5*60)
-            pass
+            nextProcess = 0
+            while nextProcess < sys.maxint and nextProcess >= 0:
+                nextProcess = botManager.processReplyQueue()
+                now = monoclock.nano_count()/1000000000
+                print "Processing replies in %i seconds"%(nextProcess-now)
+                if nextProcess-now > 1:
+                    time.sleep(nextProcess-now)
     except urllib2.URLError, e:
         print "Network error:", e
 
