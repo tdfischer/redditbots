@@ -27,8 +27,7 @@ class MarkovBot(redditbots.Bot):
         return 1
 
     def addPair(self, first, second):
-        db = self.getDatabase()
-        c = db.cursor()
+        c = self.database.cursor()
         if (first is None):
             c.execute("SELECT frequency FROM Markov WHERE word IS NULL and nextWord = ?", (second,))
         elif (second is None):
@@ -38,17 +37,17 @@ class MarkovBot(redditbots.Bot):
         res = c.fetchone()
         if (res == None):
             c.execute("INSERT INTO Markov (word, nextWord, frequency) VALUES (?, ?, 0)", (first, second))
-            db.commit()
+            self.database.commit()
         if (first is None):
             c.execute("UPDATE Markov SET frequency = frequency+1 WHERE word IS NULL AND nextWord = ?", (second,))
         elif (second is None):
             c.execute("UPDATE Markov SET frequency = frequency+1 WHERE word = ? AND nextWord IS NULL", (first,))
         else:
             c.execute("UPDATE Markov SET frequency = frequency + 1 WHERE word = ? AND nextWord = ?", (first, second))
-        db.commit()
+        self.database.commit()
 
     def nextWord(self, current):
-        c = self.getDatabase().cursor()
+        c = self.database.cursor()
         if (current is None):
             c.execute("SELECT nextWord FROM Markov WHERE word IS NULL ORDER BY RANDOM() * frequency LIMIT 1")
         else:

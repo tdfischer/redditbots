@@ -20,7 +20,9 @@ from RestrictedPython.Guards import safe_builtins
 import sys
 from bot import Bot
 import reddit
+from reddit.errors import RateLimitExceeded
 import sqlite3
+import monoclock
 
 class BotSandbox(object):
     def __init__(self, manager):
@@ -29,6 +31,8 @@ class BotSandbox(object):
         self._import = __import__
         self._bot = None
         self._manager = manager
+        self._nextReplyTime = 0
+        self._replyQueue = []
 
     def defaultGlobals(self):
         globs = dict(__builtins__ = safe_builtins)
@@ -45,14 +49,38 @@ class BotSandbox(object):
         raise NotImplementedError
 
     def _loadBot(self):
-        for klass in self.getGlobals().values():
+        for klass in self.globals.values():
             if type(klass) == type:
                 if issubclass(klass, Bot) and not (klass is Bot):
-                    self._bot = klass()
-                    self._bot.login = self.login
-                    self._bot.getDatabase = self.getDatabase
+                    self._bot = klass(self)
 
-    def getDatabase(self):
+    def queueReply(self, post, reply):
+        self._replyQueue.append((post, reply))
+        #self.processReplyQueue()
+
+    def processReplyQueue(self):
+        now = monoclock.nano_count()/1000000000
+        if now > self._nextReplyTime:
+            for pair in self._replyQueue:
+                post, reply = pair
+                self.login()
+                try:
+                    ret = post.reply(reply)
+                    self._replyQueue.remove(pair)
+                except RateLimitExceeded, e:
+                    print "Rate limit exceeded, waiting another 10 minutes."
+                self._nextReplyTime = now+60*10
+                return True
+        else:
+            print "Waiting until", self._nextReplyTime, "for next reply"
+        return len(self._replyQueue) > 0
+
+    @property
+    def replyQueue(self):
+        return self._replyQueue
+
+    @property
+    def database(self):
         db = self._manager.getBotDB(self)
         c = db.execute("PRAGMA user_version")
         version = c.fetchone()[0]
@@ -63,7 +91,8 @@ class BotSandbox(object):
     def login(self):
         self._manager.loginBot(self)
 
-    def getBot(self):
+    @property
+    def bot(self):
         if (self._bot is None):
             self._loadBot()
         return self._bot
@@ -79,7 +108,8 @@ class BotSandbox(object):
             cur = cur.__getitem__(a)
         cur.__setitem__(args[-2], args[-1])
 
-    def getGlobals(self):
+    @property
+    def globals(self):
         return self._globals
 
     def compile(self, code, filename, mode):

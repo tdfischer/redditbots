@@ -18,11 +18,22 @@
 import logging
 
 class Bot(object):
-    def __init__(self):
+    def __init__(self, sandbox):
         super(Bot, self).__init__()
         self.log = logging.getLogger("redditbot.Bots.%s"%(self.__class__.__name__))
+        self.__sbox = sandbox
 
     def login(self):
+        self.__sbox.login()
+
+    @property
+    def database(self):
+        return self.__sbox.database
+
+    def queueReply(self, post, text):
+        self.__sbox.queueReply(post, text)
+
+    def onInit(self):
         pass
 
     def onNewSubmission(self, post):
@@ -31,7 +42,7 @@ class Bot(object):
     def onNewComment(self, comment):
         pass
 
-    def getDatabase(self):
+    def queueAction(self, action):
         pass
 
     def onDBOpen(self, db, version):

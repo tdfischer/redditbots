@@ -17,6 +17,7 @@
 
 import reddit
 import logging
+import monoclock
 import sys
 from sandbox import *
 from bot import Bot
@@ -38,6 +39,7 @@ class BotManager(object):
         self.__currentLogin = None
         self._reddit = reddit.Reddit(user_agent='redditbots/0.1')
         self.__dbs = {}
+        self._actionQueue = {}
 
     def getReddit(self):
         return self._reddit
@@ -51,7 +53,7 @@ class BotManager(object):
 
     def getBotDB(self, bot):
         if not (bot in self.__dbs):
-            self.__dbs[bot] = sqlite3.connect("/tmp/%s.sqlite3"%(bot.getBot().__class__.__name__))
+            self.__dbs[bot] = sqlite3.connect("/tmp/%s.sqlite3"%(bot.bot.__class__.__name__))
         return self.__dbs[bot]
 
     def __genHook(hookName):
@@ -74,12 +76,24 @@ class BotManager(object):
 
     triggerNewSubmission = __genHook('newSubmission')
     triggerNewComment = __genHook('newComment')
+    triggerInit = __genHook('init')
+
+    def processReplyQueue(self):
+        ret = False
+        for bot in self.__bots:
+            self._log.debug("Processing reply queue for %s", bot)
+            if bot.processReplyQueue():
+                ret = True
+        return ret
 
     def runHook(self, hookName, *args, **kwargs):
         """Runs a hook"""
         hookName = "on"+hookName[0].upper()+hookName[1:]
         for bot in self.__bots:
-            self._log.debug("Running hook %s on %s", hookName, bot.getBot())
-            if hasattr(bot.getBot(), hookName):
-                handler = getattr(bot.getBot(), hookName)
-                handler(*args, **kwargs)
+            self._log.debug("Running hook %s on %s", hookName, bot.bot)
+            if hasattr(bot.bot, hookName):
+                handler = getattr(bot.bot, hookName)
+                try:
+                    handler(*args, **kwargs)
+                except Exception, e:
+                    self._log.exception("Error while running hook %s on bot %s", hookName, bot.bot)

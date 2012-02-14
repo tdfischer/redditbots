@@ -21,29 +21,50 @@ import reddit
 import logging
 import argparse
 import sys
+import urllib2
+import time
 
 def main(args):
     parser = argparse.ArgumentParser(description='Test a redditbot')
     parser.add_argument('file', type=file, help='file to use')
     parser.add_argument('--debug', action='store_true', default=False)
+    parser.add_argument('--username', type=str, help='username to run with')
+    parser.add_argument('--password', type=str, help='password to run with')
+
     options = parser.parse_args(args[1:])
     if options.debug:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
 
-    botManager = redditbots.BotManager(redditbots.TestingSandbox)
+    class TestBox(redditbots.TestingSandbox):
+        def username(self):
+            return options.username
+        def password(self):
+            return options.password
+
+    botManager = redditbots.BotManager(TestBox)
     botManager.loadBot(options.file)
+    botManager.triggerInit()
 
     r = botManager.getReddit()
 
-    r_all = r.get_subreddit('all').get_new_by_date()
+    try:
+        r_all = r.get_subreddit('all').get_new_by_date()
 
-    for post in r_all:
-        botManager.triggerNewSubmission(post)
+        print "Processing new submissions in /r/all"
+        for post in r_all:
+            botManager.triggerNewSubmission(post)
 
-    for comment in r.get_all_comments():
-        botManager.triggerNewComment(comment)
+        print "Processing new comments"
+        for comment in r.get_all_comments():
+            botManager.triggerNewComment(comment)
+
+        while botManager.processReplyQueue():
+            time.sleep(5*60)
+            pass
+    except urllib2.URLError, e:
+        print "Network error:", e
 
 if __name__ == "__main__":
     main(sys.argv)
