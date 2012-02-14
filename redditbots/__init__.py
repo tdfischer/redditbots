@@ -17,7 +17,6 @@
 
 import reddit
 import logging
-import monoclock
 import sys
 from sandbox import *
 from bot import Bot
@@ -79,11 +78,12 @@ class BotManager(object):
     triggerInit = __genHook('init')
 
     def processReplyQueue(self):
-        ret = False
+        ret = sys.maxint
         for bot in self.__bots:
             self._log.debug("Processing reply queue for %s", bot)
-            if bot.processReplyQueue():
-                ret = True
+            replyTime = bot.processReplyQueue()
+            if replyTime < ret:
+                ret = replyTime
         return ret
 
     def runHook(self, hookName, *args, **kwargs):

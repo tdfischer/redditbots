@@ -76,10 +76,12 @@ class BotSandbox(object):
                 except RateLimitExceeded, e:
                     print "Rate limit exceeded, waiting another 10 minutes."
                 self._nextReplyTime = now+60*10
-                return True
+                return self._nextReplyTime
         else:
             print "Waiting until", self._nextReplyTime, "for next reply"
-        return len(self._replyQueue) > 0
+        if len(self._replyQueue) > 0:
+            return self._nextReplyTime
+        return 0
 
     @property
     def replyQueue(self):
