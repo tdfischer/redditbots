@@ -17,6 +17,7 @@
 
 import redditbots
 import random
+import time
 
 class MarkovBot(redditbots.Bot):
     def onDBOpen(self, db, curVersion):
@@ -76,6 +77,14 @@ class MarkovBot(redditbots.Bot):
             prev = next
         self.addPair(prev, None)
 
-        randomWord = random.choice(words)
-
-        print comment.body,'->',self.buildReply(randomWord)
+        if random.randint(0, 100) < 10:
+            tries = 10
+            randomWord = random.choice(words)
+            reply = self.buildReply(randomWord)
+            while tries > 0 and len(randomWord) > 6 and len(reply) > 30:
+                tries = tries-1
+                randomWord = random.choice(words)
+                reply = self.buildReply(randomWord)
+            if tries > 0:
+                print comment.body,'->',reply
+                self.queueReply(comment, reply)
