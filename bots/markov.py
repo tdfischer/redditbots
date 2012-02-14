@@ -38,14 +38,12 @@ class MarkovBot(redditbots.Bot):
         res = c.fetchone()
         if (res == None):
             c.execute("INSERT INTO Markov (word, nextWord, frequency) VALUES (?, ?, 0)", (first, second))
-            self.database.commit()
         if (first is None):
             c.execute("UPDATE Markov SET frequency = frequency+1 WHERE word IS NULL AND nextWord = ?", (second,))
         elif (second is None):
             c.execute("UPDATE Markov SET frequency = frequency+1 WHERE word = ? AND nextWord IS NULL", (first,))
         else:
             c.execute("UPDATE Markov SET frequency = frequency + 1 WHERE word = ? AND nextWord = ?", (first, second))
-        self.database.commit()
 
     def nextWord(self, current):
         c = self.database.cursor()
@@ -69,22 +67,42 @@ class MarkovBot(redditbots.Bot):
             current = self.nextWord(current)
         return ' '.join(phrase)
 
-    def onNewComment(self, comment):
-        words = comment.body.split(' ')
-        prev = None
-        for next in words:
-            self.addPair(prev, next)
-            prev = next
-        self.addPair(prev, None)
+    def isWorthwhileText(self, text):
+        wordCount = text.count(' ')
+        validPunctuation = ('.', '?', '!', '"', "'")
+        hasValidPunct = False
+        for p in validPunctuation:
+            if text.endswith(p):
+                hasValidPunct = True
+                break
+        return hasValidPunct and len(text) > wordCount*4 and wordCount > 10
 
-        if random.randint(0, 100) < 10:
-            tries = 10
-            randomWord = random.choice(words)
+    def onNewComment(self, comment):
+        paragraphs = comment.body.split('\n\n')
+        for paragraph in paragraphs:
+            words = paragraph.split(' ')
+            prev = None
+            for next in words:
+                self.addPair(prev, next)
+                prev = next
+            self.addPair(prev, None)
+        self.database.commit()
+
+        if self.isWorthwhileText(comment.body):
+            goodWords = []
+            for word in comment.body.split(' '):
+                if len(word) > 4:
+                    goodWords.append(word)
+            randomWord = random.choice(goodWords)
+            randomWord = randomWord[0].upper() + randomWord[1:]
+            self.log.debug("Building reply for %s", randomWord)
             reply = self.buildReply(randomWord)
-            while tries > 0 and len(randomWord) > 6 and len(reply) > 30:
-                tries = tries-1
-                randomWord = random.choice(words)
+            tries = 10
+            while (not self.isWorthwhileText(reply)) and tries > 0:
+                self.log.debug("Rejecting short reply: %s", reply)
                 reply = self.buildReply(randomWord)
-            if tries > 0:
-                print comment.body,'->',reply
+                tries = tries-1
+            if self.isWorthwhileText(reply):
+                self.log.info("Original text: %s", comment.body)
+                self.log.info("Reply: %s", reply)
                 self.queueReply(comment, reply)
